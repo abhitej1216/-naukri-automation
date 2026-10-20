@@ -1,0 +1,76 @@
+[project]
+name = "naukri-automation"
+version = "0.2.0"
+description = "Self-learning Selenium bot that applies to Naukri.com recommended jobs and answers recruiter chatbots"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+keywords = ["selenium", "naukri", "automation", "scraping", "bot"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Utilities",
+]
+dependencies = [
+    "selenium>=4.0.0",
+    "python-dotenv>=1.0.0",
+    "webdriver-manager>=4.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "black",
+    "ruff",
+]
+
+[project.urls]
+Homepage = "https://github.com/<your-username>/naukri-automation"
+Issues = "https://github.com/<your-username>/naukri-automation/issues"
+
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+py-modules = ["autoapply"]
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "black",
+    "ruff",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+extend-exclude = [".venv", "screenshots", ".ruff_cache", ".pytest_cache"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "C4", "SIM", "RET", "UP"]
+ignore = [
+    "E501",    # long lines are handled by the formatter, not the linter
+    "UP006",   # keep `typing.Dict`/`List` style for Python 3.10 compatibility
+    "UP007",
+    "UP035",
+    "UP045",
+    "B008",    # function calls in argument defaults are fine here
+    "SIM105",  # contextlib.suppress is slower than try/except in hot loops
+    "RET504",  # assignment before return is clearer in the Selenium helpers
+]
+
+[tool.black]
+line-length = 100
+target-version = ["py310"]
