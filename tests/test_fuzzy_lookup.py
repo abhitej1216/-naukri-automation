@@ -90,6 +90,12 @@ def test_matches_ratio_notation_variant(answers):
     )
 
 
+def test_radio_option_match_requires_clear_match():
+    assert autoapply._match_option("Yes", ["Yes", "No"]) == 0
+    assert autoapply._match_option("Yes", ["Yes, with relocation", "Yes, remote only"]) is None
+    assert autoapply._match_option("Unrelated", ["Yes", "No"]) is None
+
+
 def test_save_answer_is_visible_immediately(tmp_path, monkeypatch):
     monkeypatch.setattr(autoapply, "ANSWERS_DB", str(tmp_path / "answers.db"))
     known = autoapply.load_answers()

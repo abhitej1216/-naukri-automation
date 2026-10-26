@@ -31,9 +31,6 @@ dev = [
     "ruff",
 ]
 
-[project.urls]
-Homepage = "https://github.com/<your-username>/naukri-automation"
-Issues = "https://github.com/<your-username>/naukri-automation/issues"
 
 [build-system]
 requires = ["setuptools", "wheel"]

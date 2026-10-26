@@ -36,7 +36,7 @@ so the next recruiter asking the same thing is handled automatically.
 
 1. **Logs in** to Naukri.com with the credentials from your `.env` file.
 2. **Navigates** to the Recommended Jobs page and opens the tab you choose.
-3. **Selects** up to 5 unapplied jobs by ticking their checkboxes, then clicks **Apply**.
+3. **Selects** up to 5 unapplied jobs per batch by ticking their checkboxes, then clicks **Apply** only after you explicitly confirm.
 4. **Answers the recruiter chatbot** that pops up in the side drawer:
    - **Radio questions** — if the answer is known, the matching option is clicked automatically.
    - **Free-text questions** — if the answer is known, it is typed in with human-like pacing.
@@ -145,7 +145,7 @@ uv run python autoapply.py      # with uv
 python autoapply.py             # with a plain venv
 ```
 
-The bot opens Edge, logs in, and then asks which tabs to apply to:
+The bot asks which tabs to use, then requires you to type `APPLY` before opening Edge and submitting anything. It continues in batches of up to 5 jobs until the selected tabs run out. It then opens Edge and logs in:
 
 ```
 ==================================================
@@ -160,7 +160,7 @@ Enter numbers (e.g. 1,3,5) or press Enter for Top Candidate:
 ```
 
 Press **Enter** to use the default (Top Candidate), or type numbers separated by commas
-(`1,3,5`) to pick several.
+(`1,3,5`) to pick several. Then type `APPLY` at the confirmation prompt to authorize real submissions; any other response cancels the run.
 
 ### When the bot asks for input
 

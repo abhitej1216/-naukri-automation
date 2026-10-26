@@ -515,9 +515,9 @@ def _find_card_checkbox(card: Any) -> Optional[Any]:
     return None
 
 
-def select_jobs_and_apply(driver: webdriver.Edge) -> int:
+def select_jobs_and_apply(driver: webdriver.Edge, max_jobs: int = MAX_SELECT) -> int:
     """
-    Select up to 5 jobs by clicking their checkboxes, then click Apply.
+    Select up to `max_jobs` jobs by clicking their checkboxes, then click Apply.
 
     Assumes we're already on the recommended jobs page.
 
@@ -546,7 +546,7 @@ def select_jobs_and_apply(driver: webdriver.Edge) -> int:
     selected = 0
     cards_without_checkbox = 0
     for card in job_cards:
-        if selected >= MAX_SELECT:
+        if selected >= min(max_jobs, MAX_SELECT):
             break
         try:
             if _is_card_selected(card):
@@ -568,7 +568,7 @@ def select_jobs_and_apply(driver: webdriver.Edge) -> int:
                 title = card.find_element(By.CSS_SELECTOR, SELECTORS["job_title"]).text
             except NoSuchElementException:
                 title = "Unknown"
-            logger.info(f"  [{selected}/{MAX_SELECT}] ✓ {title}")
+            logger.info(f"  [{selected}/{min(max_jobs, MAX_SELECT)}] ✓ {title}")
             human_wait(0.5, 1.0)
         except Exception as e:
             logger.warning(f"  Select error: {e}")
@@ -789,13 +789,13 @@ def _match_option(answer: str, options: List[str]) -> Optional[int]:
         if option == target:
             return idx
 
-    for idx, option in enumerate(normalized):
-        if option and (option in target or target in option):
-            return idx
-
-    best = difflib.get_close_matches(target, normalized, n=1, cutoff=0.85)
-    if best:
-        return normalized.index(best[0])
+    # Avoid substring matches (e.g. "Yes" matching "Yes, with relocation"):
+    # a stored answer should only be selected when the offered option is clear.
+    scores = [difflib.SequenceMatcher(None, target, option).ratio() for option in normalized]
+    ranked = sorted(enumerate(scores), key=lambda item: item[1], reverse=True)
+    if ranked and ranked[0][1] >= 0.85:
+        if len(ranked) == 1 or ranked[0][1] - ranked[1][1] >= 0.08:
+            return ranked[0][0]
     return None
 
 
@@ -1134,7 +1134,18 @@ def main() -> None:
         return
 
     selected_tabs = select_tabs()
-    logger.info(f"Applying to tabs: {', '.join(t['label'] for t in selected_tabs)}")
+    logger.info(f"Selected tabs: {', '.join(t['label'] for t in selected_tabs)}")
+    try:
+        confirmation = input(
+            f"This will submit real applications (up to {MAX_SELECT} per batch). "
+            "Type APPLY to continue: "
+        ).strip()
+    except EOFError:
+        logger.error("No interactive confirmation available; stopping safely.")
+        return
+    if confirmation != "APPLY":
+        logger.info("Confirmation not provided; stopping without applying.")
+        return
 
     known_answers = load_answers()
     total_applied = 0
