@@ -17,7 +17,7 @@ def _clear_cache():
 @pytest.fixture
 def answers():
     return {
-        "What is your current CTC in Lacs per annum?": "625000",
+        "What is your current CTC in Lacs per annum?": "650000",
         "What is your expected CTC in Lacs per annum?": "1000000",
         "How many years of experience do you have in IICS ?": "2-3 years",
         "Are your comfortable from 5 Days from Onsite?": "Yes",
@@ -53,7 +53,90 @@ def test_matches_stored_question_with_extra_detail(answers):
 
 def test_distinguishes_current_and_expected_ctc(answers):
     assert autoapply.fuzzy_lookup("What is your expected CTC?", answers) == "1000000"
-    assert autoapply.fuzzy_lookup("What is your current CTC?", answers) == "625000"
+    assert autoapply.fuzzy_lookup("What is your current CTC?", answers) == "650000"
+
+
+def test_skill_specific_years_of_experience_share_answer():
+    stored = {"How many years of experience do you have in Python?": "2.5 years"}
+    assert (
+        autoapply.fuzzy_lookup(
+            "How many years of experience do you have in SQL?", stored
+        )
+        == "2.5 years"
+    )
+    assert (
+        autoapply.fuzzy_lookup(
+            "How many years of experience do you have in Blockchain?", stored
+        )
+        == "2.5 years"
+    )
+
+
+def test_tab_configuration_uses_current_naukri_tabs(monkeypatch):
+    assert [tab["label"] for tab in autoapply.TABS] == [
+        "Applies",
+        "Handpicked for you",
+        "Profile",
+        "Preferences",
+        "You might like",
+    ]
+    monkeypatch.setattr("builtins.input", lambda _: "")
+    assert autoapply.select_tabs() == [autoapply.TABS[0]]
+
+
+def test_profile_defaults_override_stale_experience_and_location_answers():
+    stored = {
+        "How many years of experience in Python?": "1 year",
+        "What is your current location?": "Delhi",
+    }
+    assert (
+        autoapply.answer_for_question(
+            "How many years of experience in Blockchain?", stored
+        )
+        == "2.5 years"
+    )
+    assert autoapply.answer_for_question("What is your current city?", stored) == "Noida"
+
+
+def test_date_of_birth_fallback_matches_common_phrasings(monkeypatch):
+    monkeypatch.setattr(autoapply, "DEFAULT_DATE_OF_BIRTH", "28121999")
+    assert autoapply.profile_fallback_answer("What is your DOB?") == "28121999"
+    assert autoapply.profile_fallback_answer("Date of birth") == "28121999"
+    assert autoapply.profile_fallback_answer("Please enter your birth date") == "28121999"
+    assert autoapply.profile_fallback_answer("What is your joining date?") is None
+
+
+def test_profile_defaults_cover_experience_and_location_questions():
+    assert autoapply.profile_fallback_answer("Years of experience in Blockchain?") == "2.5 years"
+    assert autoapply.profile_fallback_answer("Total Exp:") == "2.5 years"
+    assert autoapply.profile_fallback_answer("What is your current city?") == "Noida"
+    assert autoapply.profile_fallback_answer("What is your preferred location?") == "Noida"
+    assert (
+        autoapply.profile_fallback_answer(
+            "Are you comfortable for Pune location (Kharadi)?"
+        )
+        == "Yes"
+    )
+    assert autoapply.profile_fallback_answer("What is your notice period?") is None
+
+
+def test_total_exp_abbreviation_matches_total_experience_answer():
+    stored = {"Total experience?": "2.5 years"}
+    assert autoapply.fuzzy_lookup("Total Exp:", stored) == "2.5 years"
+    assert autoapply.fuzzy_lookup("What is your total experience?", stored) == "2.5 years"
+
+
+def test_skill_experience_match_does_not_match_total_experience():
+    stored = {"How many years of experience do you have in Python?": "2.5 years"}
+    assert autoapply.fuzzy_lookup("What is your total experience?", stored) is None
+
+
+def test_conflicting_skill_experience_answers_are_not_guessed():
+    stored = {
+        "How many years of experience do you have in Python?": "2.5 years",
+        "How many years of experience do you have in SQL?": "4 years",
+    }
+    assert autoapply.fuzzy_lookup("How many years of experience in Java?", stored) is None
 
 
 def test_rejects_different_technology(answers):
@@ -102,10 +185,10 @@ def test_save_answer_is_visible_immediately(tmp_path, monkeypatch):
 
     assert autoapply.fuzzy_lookup("What is your current CTC?", known) is None
 
-    autoapply.save_answer("What is your current CTC in Lacs per annum?", "625000")
+    autoapply.save_answer("What is your current CTC in Lacs per annum?", "650000")
 
     # The dict handed out earlier must see the new answer without a reload.
-    assert autoapply.fuzzy_lookup("What is your current CTC?", known) == "625000"
+    assert autoapply.fuzzy_lookup("What is your current CTC?", known) == "650000"
 
 
 def test_save_answer_counts_first_use(tmp_path, monkeypatch):

@@ -58,12 +58,15 @@ load_dotenv()
 
 NAUKRI_EMAIL: str = os.getenv('NAUKRI_EMAIL', '')
 NAUKRI_PASSWORD: str = os.getenv('NAUKRI_PASSWORD', '')
+DEFAULT_EXPERIENCE: str = os.getenv('NAUKRI_EXPERIENCE', '2.5 years')
+DEFAULT_LOCATION: str = os.getenv('NAUKRI_LOCATION', 'Noida')
+DEFAULT_DATE_OF_BIRTH: str = os.getenv('NAUKRI_DATE_OF_BIRTH', '')
 
 TABS: List[Dict[str, Any]] = [
-    {"num": 1, "id": "apply",        "label": "Applies"},
-    {"num": 2, "id": "profile",      "label": "Profile"},
-    {"num": 3, "id": "top_candidate", "label": "Top Candidate"},
-    {"num": 4, "id": "preference",   "label": "Preferences"},
+    {"num": 1, "id": "apply", "label": "Applies"},
+    {"num": 2, "id": "handpicked", "label": "Handpicked for you"},
+    {"num": 3, "id": "profile", "label": "Profile"},
+    {"num": 4, "id": "preference", "label": "Preferences"},
     {"num": 5, "id": "similar_jobs", "label": "You might like"},
 ]
 
@@ -256,6 +259,7 @@ _LEADING_NUMBER_RE = re.compile(r"^\s*(?:q\s*)?\d+\s*[\.\)\:\-]\s*", re.IGNORECA
 _RATIO_RE = re.compile(r"(\d)\s*[xX\*\/]\s*(\d)")
 _PUNCT_RE = re.compile(r"[^\w\s]")
 _WHITESPACE_RE = re.compile(r"\s+")
+_EXPERIENCE_ABBREVIATION_RE = re.compile(r"\bexp\b", re.IGNORECASE)
 
 
 def _normalize_question(text: str) -> str:
@@ -264,6 +268,7 @@ def _normalize_question(text: str) -> str:
         return ""
     normalized = _RATIO_RE.sub(r"\1x\2", text.lower())  # 24*7 / 24/7 → 24x7
     normalized = _LEADING_NUMBER_RE.sub("", normalized)  # "1. Do you..." → "do you..."
+    normalized = _EXPERIENCE_ABBREVIATION_RE.sub("experience", normalized)
     normalized = _PUNCT_RE.sub(" ", normalized)
     return _WHITESPACE_RE.sub(" ", normalized).strip()
 
@@ -305,6 +310,53 @@ def _question_similarity(
     return 0.5 * coverage + 0.5 * sequence
 
 
+def profile_fallback_answer(question_text: str) -> Optional[str]:
+    """Return configured profile defaults for experience and location questions."""
+    normalized = _normalize_question(question_text)
+    if re.search(
+        r"\b(?:dob|date of birth|birth date|birthdate)\b", normalized
+    ):
+        return DEFAULT_DATE_OF_BIRTH
+    if re.search(r"\b(?:experience|exp)\b", normalized):
+        return DEFAULT_EXPERIENCE
+    asks_location_comfort = (
+        re.search(r"\b(?:comfortable|comfort|willing)\b", normalized)
+        and re.search(r"\b(?:location|located|city|relocate|relocation)\b", normalized)
+    )
+    if asks_location_comfort:
+        return "Yes"
+    if re.search(r"\b(?:location|located|city)\b", normalized):
+        return DEFAULT_LOCATION
+    return None
+
+
+def answer_for_question(question_text: str, known_answers: Dict[str, str]) -> Optional[str]:
+    """Prefer configured profile answers, then use the learned-answer store."""
+    fallback = profile_fallback_answer(question_text)
+    if fallback:
+        return fallback
+    return fuzzy_lookup(question_text, known_answers)
+
+
+def _skill_experience_signature(text: str) -> Optional[str]:
+    """Return a shared signature for skill-specific years-of-experience questions."""
+    normalized = _normalize_question(text)
+    if not re.search(r"\b(?:experience|exp)\b", normalized):
+        return None
+    if not re.search(r"\byears?\b", normalized):
+        return None
+
+    # Generalize only the skill named after a clear skill qualifier. This allows
+    # Python and SQL experience questions to share an answer without conflating
+    # total experience, notice period, or other unrelated fields.
+    return re.sub(
+        r"\b(in|with)\s+[\w+#.]+\b",
+        r"\1 skill",
+        normalized,
+        count=1,
+    )
+
+
 def fuzzy_lookup(
     question_text: str, known_answers: Dict[str, str], cutoff: float = 0.7
 ) -> Optional[str]:
@@ -322,6 +374,17 @@ def fuzzy_lookup(
     if not query:
         return None
     query_tokens = _question_tokens(question_text)
+    experience_signature = _skill_experience_signature(question_text)
+    if experience_signature:
+        matching_answers = {
+            answer
+            for key, answer in known_answers.items()
+            if _skill_experience_signature(key) == experience_signature
+        }
+        if len(matching_answers) == 1:
+            return matching_answers.pop()
+        if len(matching_answers) > 1:
+            return None
 
     best_score = 0.0
     best_answer: Optional[str] = None
@@ -793,9 +856,10 @@ def _match_option(answer: str, options: List[str]) -> Optional[int]:
     # a stored answer should only be selected when the offered option is clear.
     scores = [difflib.SequenceMatcher(None, target, option).ratio() for option in normalized]
     ranked = sorted(enumerate(scores), key=lambda item: item[1], reverse=True)
-    if ranked and ranked[0][1] >= 0.85:
-        if len(ranked) == 1 or ranked[0][1] - ranked[1][1] >= 0.08:
-            return ranked[0][0]
+    if ranked and ranked[0][1] >= 0.85 and (
+        len(ranked) == 1 or ranked[0][1] - ranked[1][1] >= 0.08
+    ):
+        return ranked[0][0]
     return None
 
 
@@ -848,7 +912,7 @@ def handle_radio_buttons(driver: webdriver.Edge, known_answers: Dict[str, str]) 
     logger.info(f"📋 Radio: '{question_text}'")
     logger.debug(f"   Options: {options}")
 
-    known = fuzzy_lookup(question_text, known_answers)
+    known = answer_for_question(question_text, known_answers)
     if known:
         idx = _match_option(known, options)
         if idx is not None:
@@ -922,8 +986,8 @@ def handle_contenteditable(driver: webdriver.Edge, known_answers: Dict[str, str]
     question_text = get_latest_bot_question(driver) or "ChatbotTextQuestion"
     logger.info(f"📝 Text question: '{question_text}'")
 
-    # KNOWN ANSWER → auto-fill with human-like typing
-    known = fuzzy_lookup(question_text, known_answers)
+    # Configured profile answer or learned answer → auto-fill with human-like typing
+    known = answer_for_question(question_text, known_answers)
     if known:
         try:
             fresh_text_area = find_chat_text_area(driver)
@@ -1072,10 +1136,10 @@ def select_tabs() -> List[Dict[str, Any]]:
     for t in TABS:
         print(f"  {t['num']}. {t['label']}")
     print("=" * 50)
-    raw = input("Enter numbers (e.g. 1,3,5) or press Enter for Top Candidate: ").strip()
+    raw = input("Enter numbers (e.g. 1,3,5) or press Enter for Applies: ").strip()
 
     if not raw:
-        return [TABS[2]]  # default: Top Candidate
+        return [TABS[0]]  # default: Applies
 
     selected = []
     for part in raw.split(','):
@@ -1086,8 +1150,8 @@ def select_tabs() -> List[Dict[str, Any]]:
                 selected.append(TABS[idx])
 
     if not selected:
-        print("Invalid input — defaulting to Top Candidate.")
-        return [TABS[2]]
+        print("Invalid input — defaulting to Applies.")
+        return [TABS[0]]
 
     return selected
 
@@ -1106,8 +1170,20 @@ def navigate_to_tab(driver: webdriver.Edge, tab_id: str) -> bool:
             EC.presence_of_element_located((By.CSS_SELECTOR, SELECTORS["tab_list"]))
         )
         time.sleep(2)
-        # Click the inner label, not the wrapper div
-        tab_el = driver.find_element(By.CSS_SELECTOR, f"div#{tab_id} .tab-list-item")
+        # Prefer the known tab id, then fall back to its visible label. Naukri
+        # changes internal ids and may append live job counts to tab labels.
+        tab_el = None
+        try:
+            tab_el = driver.find_element(By.CSS_SELECTOR, f"div#{tab_id} .tab-list-item")
+        except NoSuchElementException:
+            tab = next((item for item in TABS if item["id"] == tab_id), None)
+            if tab is None:
+                raise
+            tab_el = driver.find_element(
+                By.XPATH,
+                "//*[contains(@class, 'tab-list-item') and "
+                f"contains(normalize-space(.), '{tab['label']}')]",
+            )
         driver.execute_script("arguments[0].scrollIntoView(true);", tab_el)
         driver.execute_script("arguments[0].click();", tab_el)
         logger.info(f"Switched to tab: {tab_id}")

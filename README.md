@@ -46,13 +46,13 @@ so the next recruiter asking the same thing is handled automatically.
 
 ### The tabs you can apply from
 
-| # | Tab            | Notes                                        |
-|---|----------------|----------------------------------------------|
-| 1 | Applies        |                                             |
-| 2 | Profile        |                                             |
-| 3 | Top Candidate  | **Default** when you press Enter             |
-| 4 | Preferences    |                                             |
-| 5 | You might like |                                             |
+| # | Tab                | Notes                          |
+|---|--------------------|--------------------------------|
+| 1 | Applies            | **Default** when you press Enter |
+| 2 | Handpicked for you |                                |
+| 3 | Profile            |                                |
+| 4 | Preferences        |                                |
+| 5 | You might like     |                                |
 
 ---
 
@@ -132,7 +132,12 @@ cp .env.example .env
 ```dotenv
 NAUKRI_EMAIL=your.email@example.com
 NAUKRI_PASSWORD=your-naukri-password
+NAUKRI_EXPERIENCE=2.5 years
+NAUKRI_LOCATION=Noida
+NAUKRI_DATE_OF_BIRTH=DDMMYYYY
 ```
+
+Experience and location answers default to `2.5 years` and `Noida`. Set `NAUKRI_EXPERIENCE` and `NAUKRI_LOCATION` to change them. Configure `NAUKRI_DATE_OF_BIRTH` in your private `.env` (for example, `28121999`) for DOB questions; the date is intentionally not hard-coded into the project. These defaults are used for recognized questions when no saved answer matches. Questions asking whether you are comfortable with a location use `Yes`. Radio questions are only auto-selected when the answer matches an available option.
 
 `.env` is git-ignored — **never commit your real credentials**.
 
@@ -151,15 +156,15 @@ The bot asks which tabs to use, then requires you to type `APPLY` before opening
 ==================================================
 Select job tabs to apply to:
   1. Applies
-  2. Profile
-  3. Top Candidate
+  2. Handpicked for you
+  3. Profile
   4. Preferences
   5. You might like
 ==================================================
-Enter numbers (e.g. 1,3,5) or press Enter for Top Candidate:
+Enter numbers (e.g. 1,3,5) or press Enter for Applies:
 ```
 
-Press **Enter** to use the default (Top Candidate), or type numbers separated by commas
+Press **Enter** to use the default (Applies), or type numbers separated by commas
 (`1,3,5`) to pick several. Then type `APPLY` at the confirmation prompt to authorize real submissions; any other response cancels the run.
 
 ### When the bot asks for input
