@@ -1,6 +1,5 @@
 """Tests for the question→answer matcher in autoapply.py."""
 
-import json
 import sqlite3
 
 import pytest
@@ -30,39 +29,6 @@ def answers():
         ),
     }
 
-
-def test_ai_answers_only_when_enabled_and_resume_supports_it(tmp_path, monkeypatch):
-    resume = tmp_path / "resume.txt"
-    resume.write_text("Worked as a Python developer for 2.5 years.", encoding="utf-8")
-    monkeypatch.setattr(autoapply, "RESUME_PATH", resume)
-    monkeypatch.setattr(autoapply, "AI_ENABLED", True)
-    monkeypatch.setattr(autoapply, "AI_API_KEY", "test-key")
-
-    prompts = {}
-
-    def fake_invoke(system_prompt, user_prompt):
-        prompts["system"] = system_prompt
-        prompts["user"] = user_prompt
-        return json.dumps({"supported": True, "answer": "2.5 years"})
-
-    monkeypatch.setattr(autoapply, "_invoke_ai_model", fake_invoke)
-    assert autoapply.ai_answer_from_resume("Years of Python experience?") == "2.5 years"
-    assert "Worked as a Python developer" in prompts["user"]
-    assert "Never infer or invent facts" in prompts["system"]
-
-
-def test_ai_rejects_unsupported_resume_answer(tmp_path, monkeypatch):
-    resume = tmp_path / "resume.txt"
-    resume.write_text("Python developer.", encoding="utf-8")
-    monkeypatch.setattr(autoapply, "RESUME_PATH", resume)
-    monkeypatch.setattr(autoapply, "AI_ENABLED", True)
-    monkeypatch.setattr(autoapply, "AI_API_KEY", "test-key")
-    monkeypatch.setattr(
-        autoapply,
-        "_invoke_ai_model",
-        lambda system_prompt, user_prompt: '{"supported": false, "answer": ""}',
-    )
-    assert autoapply.ai_answer_from_resume("What is your date of birth?") is None
 
 
 def test_normalization_strips_numbering_and_punctuation():

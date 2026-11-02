@@ -136,20 +136,10 @@ NAUKRI_EXPERIENCE=2.5 years
 NAUKRI_CURRENT_CTC=650000
 NAUKRI_LOCATION=Noida
 NAUKRI_DATE_OF_BIRTH=DDMMYYYY
-NAUKRI_AI_ENABLED=false
-NAUKRI_AI_PROVIDER=google_genai
-GEMINI_API_KEY=your-gemini-api-key
-NAUKRI_AI_MODEL=gemini-2.5-flash
-NAUKRI_RESUME_PATH=resume.pdf
 ```
 
 Experience, current CTC, and location answers default to `2.5 years`, `650000`, and `Noida`. Set `NAUKRI_EXPERIENCE`, `NAUKRI_CURRENT_CTC`, and `NAUKRI_LOCATION` to change them. Expected CTC is not covered by the current-CTC default. Configure `NAUKRI_DATE_OF_BIRTH` in your private `.env` for DOB questions; the date is intentionally not hard-coded into the project. These defaults are used for recognized questions when no saved answer matches. Questions asking whether you are comfortable with a location use `Yes`. Radio questions are only auto-selected when the answer matches an available option.
 
-### Optional resume-based AI answers
-
-AI is disabled by default. The integration uses LangChain's provider-neutral chat model API. To use Gemini, set `NAUKRI_AI_ENABLED=true`, `NAUKRI_AI_PROVIDER=google_genai`, `GEMINI_API_KEY`, and `NAUKRI_RESUME_PATH` in `.env`. Install dependencies with `uv sync` or `pip install -r requirements.txt`. To use another LangChain-supported provider, set `NAUKRI_AI_PROVIDER` and `NAUKRI_AI_MODEL`, install that provider's LangChain integration package, and configure its provider-native API key environment variable (or `NAUKRI_AI_API_KEY` for providers supported by the key adapter). Unknown questions are sent with the resume text to the selected model; the bot only accepts answers the model marks as supported by the resume. If the resume does not support an answer, AI fails, or a radio answer does not match an option, the bot asks you manually instead. Accepted AI answers are saved in the local answer database for future runs.
-
-**Privacy:** enabling this feature sends resume text and application questions to your selected AI provider. Keep the resume/API key private, review that provider's data policies, and leave AI disabled if you do not want that data shared.
 
 `.env` is git-ignored — **never commit your real credentials**.
 
