@@ -21,6 +21,12 @@ naukri_bot.log
 *.log
 screenshots/
 
+# Local resumes (personal data — keep them local)
+resume/
+resume.pdf
+resume.txt
+resume.md
+
 # Learned answer store (personal data — keep it local)
 application_answers.db
 application_answers.csv

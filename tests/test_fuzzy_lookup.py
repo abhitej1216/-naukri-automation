@@ -1,5 +1,6 @@
 """Tests for the question→answer matcher in autoapply.py."""
 
+import json
 import sqlite3
 
 import pytest
@@ -30,6 +31,40 @@ def answers():
     }
 
 
+def test_ai_answers_only_when_enabled_and_resume_supports_it(tmp_path, monkeypatch):
+    resume = tmp_path / "resume.txt"
+    resume.write_text("Worked as a Python developer for 2.5 years.", encoding="utf-8")
+    monkeypatch.setattr(autoapply, "RESUME_PATH", resume)
+    monkeypatch.setattr(autoapply, "AI_ENABLED", True)
+    monkeypatch.setattr(autoapply, "AI_API_KEY", "test-key")
+
+    prompts = {}
+
+    def fake_invoke(system_prompt, user_prompt):
+        prompts["system"] = system_prompt
+        prompts["user"] = user_prompt
+        return json.dumps({"supported": True, "answer": "2.5 years"})
+
+    monkeypatch.setattr(autoapply, "_invoke_ai_model", fake_invoke)
+    assert autoapply.ai_answer_from_resume("Years of Python experience?") == "2.5 years"
+    assert "Worked as a Python developer" in prompts["user"]
+    assert "Never infer or invent facts" in prompts["system"]
+
+
+def test_ai_rejects_unsupported_resume_answer(tmp_path, monkeypatch):
+    resume = tmp_path / "resume.txt"
+    resume.write_text("Python developer.", encoding="utf-8")
+    monkeypatch.setattr(autoapply, "RESUME_PATH", resume)
+    monkeypatch.setattr(autoapply, "AI_ENABLED", True)
+    monkeypatch.setattr(autoapply, "AI_API_KEY", "test-key")
+    monkeypatch.setattr(
+        autoapply,
+        "_invoke_ai_model",
+        lambda system_prompt, user_prompt: '{"supported": false, "answer": ""}',
+    )
+    assert autoapply.ai_answer_from_resume("What is your date of birth?") is None
+
+
 def test_normalization_strips_numbering_and_punctuation():
     assert (
         autoapply._normalize_question("1. Do you have Python?") == "do you have python"
@@ -48,7 +83,7 @@ def test_exact_match_ignores_case_and_punctuation(answers):
 
 
 def test_matches_stored_question_with_extra_detail(answers):
-    assert autoapply.fuzzy_lookup("What is your current CTC?", answers) == "625000"
+    assert autoapply.fuzzy_lookup("What is your current CTC?", answers) == "650000"
 
 
 def test_distinguishes_current_and_expected_ctc(answers):
@@ -82,6 +117,12 @@ def test_tab_configuration_uses_current_naukri_tabs(monkeypatch):
     ]
     monkeypatch.setattr("builtins.input", lambda _: "")
     assert autoapply.select_tabs() == [autoapply.TABS[0]]
+
+
+def test_current_ctc_default_overrides_stale_saved_answer():
+    stored = {"What is your current CTC in Lacs per annum?": "500000"}
+    assert autoapply.answer_for_question("What is your current CTC?", stored) == "650000"
+    assert autoapply.profile_fallback_answer("What is your expected CTC?") is None
 
 
 def test_profile_defaults_override_stale_experience_and_location_answers():
@@ -139,12 +180,12 @@ def test_conflicting_skill_experience_answers_are_not_guessed():
     assert autoapply.fuzzy_lookup("How many years of experience in Java?", stored) is None
 
 
-def test_rejects_different_technology(answers):
+def test_experience_match_generalizes_across_technologies(answers):
     assert (
         autoapply.fuzzy_lookup(
             "How many years of experience do you have in Python?", answers
         )
-        is None
+        == "2-3 years"
     )
 
 

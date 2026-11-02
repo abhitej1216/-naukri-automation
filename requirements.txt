@@ -5,3 +5,6 @@
 selenium>=4.0.0
 python-dotenv>=1.0.0
 webdriver-manager>=4.0.0
+pypdf>=5.0.0
+langchain>=1.0.0
+langchain-google-genai>=4.0.0
